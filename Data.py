@@ -40,8 +40,8 @@ def read_family_data():
     return family_list
 
 
-def write_family_data(solution: Solution):
-    with open('submission.csv', mode='w', newline='') as family_file:
+def write_family_data(solution: Solution, seed_millis):
+    with open('submission_' + str(seed_millis) + '.csv', mode='w', newline='') as family_file:
         family_writer = csv.writer(family_file, delimiter=',')
         family_day_list = list()
         for d in range(len(solution.representation)):
