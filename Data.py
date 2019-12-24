@@ -1,10 +1,11 @@
 import csv
 
 import Familly
+import Solution
 
-min_people = 125
-max_people = 300
-n_days = 100
+min_people: int = 125
+max_people: int = 300
+n_days: int = 100
 preference_cost = {0: [0, 0, 0],
                    1: [50, 0, 0],
                    2: [50, 9, 0],
@@ -37,6 +38,20 @@ def read_family_data():
                 line_count += 1
                 family_list.append(Familly.Family(family_id, choice_list, n_people))
     return family_list
+
+
+def write_family_data(solution: Solution):
+    with open('submission.csv', mode='w', newline='') as family_file:
+        family_writer = csv.writer(family_file, delimiter=',')
+        family_day_list = list()
+        for d in range(len(solution.representation)):
+            day = solution.representation[d]
+            for f in day:
+                family_day_list.append([f, d + 1])
+        family_day_list.sort(key=lambda c: c[0])
+        family_writer.writerow(['family_id', 'assigned_day'])
+        for fd in family_day_list:
+            family_writer.writerow([fd[0], fd[1]])
 
 
 def get_family_choice(family_list):
