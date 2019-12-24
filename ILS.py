@@ -213,7 +213,7 @@ class ILS:
                 home = Solution.copy(home)
             current = Solution.copy(home)
             i += 1
-            if i % 2000 == 0:
+            if i % 2000 == 0 or i == 1:
                 print("Writing best solution " + str(round(best.evaluation, 2)) + " to file...")
                 Data.write_family_data(best, self.seed_millis)
         return best
