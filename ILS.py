@@ -3,6 +3,7 @@ import time
 from copy import deepcopy
 
 import Data
+import Evaluation
 import Parameters
 import Solution
 
@@ -33,12 +34,12 @@ class ILS:
             random_index = random.randrange(0, len(family_index_in_order))
             family_index_random_order.append(family_index_in_order[random_index])
             family_index_in_order.pop(random_index)
-        solution = list()
+        representation = list()
         solution_occupancy = list()
         for i in range(Data.n_days):
             day = list()
             day_occupancy = 0
-            solution.append(day)
+            representation.append(day)
             solution_occupancy.append(day_occupancy)
         while len(family_index_random_order) > 0:
             f = family_index_random_order[0]
@@ -47,7 +48,7 @@ class ILS:
             for d in family.choice:
                 if solution_occupancy[d - 1] + int(
                         family.n_people) <= Parameters.initial_solution_fill_factor * Data.max_people:
-                    solution[d - 1].append(family.id)
+                    representation[d - 1].append(family.id)
                     solution_occupancy[d - 1] += int(family.n_people)
                     family_index_random_order.pop(0)
                     family_assigned = True
@@ -58,121 +59,77 @@ class ILS:
                         family.n_people) <= Data.max_people) and (solution_occupancy[d - 1] + int(
                         family.n_people) >= Data.min_people)
                     if is_valid_assignment:
-                        solution[d - 1].append(family.id)
+                        representation[d - 1].append(family.id)
                         solution_occupancy[d - 1] += int(family.n_people)
                         family_index_random_order.pop(0)
                         break
-        pref_cost = self.preference_cost(solution)
-        acc_penalty = self.accounting_penalty(solution_occupancy)
-        result = Solution.Solution(solution, solution_occupancy, pref_cost, acc_penalty)
+        pref_cost = Evaluation.get_preference_cost(representation, self.family_list, self.family_choices)
+        acc_penalty = Evaluation.get_accounting_penalty(solution_occupancy)
+        result = Solution.Solution(representation, solution_occupancy, pref_cost, acc_penalty)
         return result
 
-    def accounting_penalty(self, solution_occupancy):
-        p = 0
-        for i in range(len(solution_occupancy) - 1):
-            occupancy_current = solution_occupancy[i]
-            occupancy_next = solution_occupancy[i + 1]
-            p = p + ((occupancy_current - 125) / 400.0) * occupancy_current ** (
-                    1 / 2 + (abs(occupancy_current - occupancy_next) / 50.0))
-        last_occupancy = solution_occupancy[len(solution_occupancy) - 1]
-        p += ((last_occupancy - 125) / 400.0) * last_occupancy ** (1 / 2.0)
-        return p
+    def select_top_min(self, occupancy):
+        min_load_days = list()
+        i = 0
+        while i < len(occupancy)and len(min_load_days) < Parameters.selection_threshold:
+            min_day_load = occupancy[i]
+            min_day_index = i
+            for j in range(i + 1, Data.n_days, 1):
+                if occupancy[j] < min_day_load:
+                    min_day_load = occupancy[j]
+                    min_day_index = j
+            if min_day_index not in min_load_days:
+                min_load_days.append(min_day_index)
+            i = i + 1
+        return min_load_days
 
-    def accounting_penalty_delta(self, solution_occupancy, e, remove_day, insert_day, day_load_change):
-        p = e
-        occupancy_current_remove_day = solution_occupancy[remove_day]
-        occupancy_current_insert_day = solution_occupancy[insert_day]
-        remove_coefficent = 0
-        insert_coefficent = 0
-        if remove_day == 0 and insert_day != Data.n_days - 1:
-            occupancy_next_remove_day = solution_occupancy[remove_day + 1]
-            occupancy_previous_insert_day = solution_occupancy[insert_day - 1]
-            occupancy_next_insert_day = solution_occupancy[insert_day + 1]
-            remove_coefficent = 1
-        elif remove_day == 0 and insert_day == Data.n_days:
-            occupancy_next_remove_day = solution_occupancy[remove_day + 1]
-            occupancy_previous_insert_day = solution_occupancy[insert_day - 1]
-            occupancy_next_insert_day = occupancy_current_insert_day
-        elif remove_day != Data.n_days - 1 and insert_day == 0:
-            occupancy_previous_remove_day = solution_occupancy[remove_day - 1]
-            occupancy_next_remove_day = solution_occupancy[remove_day + 1]
-            occupancy_next_insert_day = solution_occupancy[insert_day + 1]
-        elif remove_day == Data.n_days - 1 and insert_day == 0:
-            occupancy_previous_remove_day = solution_occupancy[remove_day - 1]
-            occupancy_next_remove_day = occupancy_current_remove_day
-            occupancy_next_insert_day = solution_occupancy[insert_day + 1]
-        elif remove_day == Data.n_days - 1 and insert_day != Data.n_days - 1:
-            occupancy_previous_remove_day = solution_occupancy[remove_day - 1]
-            occupancy_next_remove_day = occupancy_current_remove_day
-            occupancy_previous_insert_day = solution_occupancy[insert_day - 1]
-            occupancy_next_insert_day = solution_occupancy[insert_day + 1]
-        elif remove_day != Data.n_days - 1 and insert_day == Data.n_days - 1:
-            occupancy_previous_remove_day = solution_occupancy[remove_day - 1]
-            occupancy_next_remove_day = solution_occupancy[remove_day + 1]
-            occupancy_previous_insert_day = solution_occupancy[insert_day - 1]
-            occupancy_next_insert_day = occupancy_current_insert_day
-        elif remove_day != Data.n_days - 1 and insert_day != Data.n_days - 1:
-            occupancy_previous_remove_day = solution_occupancy[remove_day - 1]
-            occupancy_next_remove_day = solution_occupancy[remove_day + 1]
-            occupancy_previous_insert_day = solution_occupancy[insert_day - 1]
-            occupancy_next_insert_day = solution_occupancy[insert_day + 1]
+    def select_top_max(self, occupancy):
+        max_load_days = list()
+        i = 0
+        while i < len(occupancy) and len(max_load_days) < Parameters.selection_threshold:
+            max_day_load = occupancy[i]
+            max_day_index = i
+            for j in range(i + 1, Data.n_days, 1):
+                if occupancy[j] > max_day_load:
+                    max_day_load = occupancy[j]
+                    max_day_index = j
+            if max_day_index not in max_load_days:
+                max_load_days.append(max_day_index)
+            i = i + 1
+        return max_load_days
 
-        if remove_day == insert_day - 1 or remove_day == insert_day + 1:
-            """ In case insert and remove days are one after the other """
-            occupancy_current_remove_day -= day_load_change
-            occupancy_current_insert_day += day_load_change
-
-        penalty_to_remove = ((occupancy_current_remove_day - 125) / 400.0) * occupancy_current_remove_day ** (
-                1 / 2 + (abs(occupancy_current_remove_day - occupancy_next_remove_day) / 50.0))
-        penalty_to_add = ((occupancy_current_insert_day - 125) / 400.0) * occupancy_current_insert_day ** (
-                1 / 2 + (abs(occupancy_current_insert_day - occupancy_next_insert_day) / 50.0))
-        last_occupancy_remove_day = solution_occupancy[remove_day]
-        penalty_to_remove = ((last_occupancy_remove_day - 125) / 400.0) * last_occupancy_remove_day ** (1 / 2.0)
-        occupancy_next_insert_day = solution_occupancy[insert_day + 1]
-        penalty_to_add = ((occupancy_current_insert_day - 125) / 400.0) * occupancy_current_insert_day ** (
-                1 / 2 + (abs(occupancy_current_insert_day - occupancy_next_insert_day) / 50.0))
-
-        occupancy_current_remove_day = solution_occupancy[remove_day]
-        occupancy_next_remove_day = solution_occupancy[remove_day + 1]
-        penalty_to_remove = ((occupancy_current_remove_day - 125) / 400.0) * occupancy_current_remove_day ** (
-                1 / 2 + (abs(occupancy_current_remove_day - occupancy_next_remove_day) / 50.0))
-        last_occupancy_insert_day = solution_occupancy[insert_day]
-        penalty_to_add = ((last_occupancy_insert_day - 125) / 400.0) * last_occupancy_insert_day ** (1 / 2.0)
-
-        last_occupancy_remove_day = solution_occupancy[remove_day]
-        penalty_to_remove = ((last_occupancy_remove_day - 125) / 400.0) * last_occupancy_remove_day ** (1 / 2.0)
-        last_occupancy_insert_day = solution_occupancy[insert_day]
-        penalty_to_add = ((last_occupancy_insert_day - 125) / 400.0) * last_occupancy_insert_day ** (1 / 2.0)
-        p -= penalty_to_remove
-        p += penalty_to_add
-        if p < 0:
-            print("Test")
-        return p
-
-    def preference_cost(self, solution):
-        penalty = 0
-        for d in range(len(solution)):
-            day = solution[d]
-            for f in day:
-                pc = Data.preference_cost[self.family_choices[f][d]]
-                penalty += (pc[0] + int(self.family_list[f].n_people) * (pc[1] + pc[2]))
-        return penalty
-
-    def preference_cost_delta(self, e, remove_day, insert_day, family_id, day_load_change):
-        penalty = e
-        pc_rd = Data.preference_cost[self.family_choices[family_id][remove_day]]
-        pc_id = Data.preference_cost[self.family_choices[family_id][insert_day]]
-        penalty -= (pc_rd[0] + day_load_change * (pc_rd[1] + pc_rd[2]))
-        penalty += (pc_id[0] + day_load_change * (pc_id[1] + pc_id[2]))
-        return penalty
+    def select_top_max_preference_families(self, day_family_list, family_choices, remove_day):
+        max_list = list()
+        i = 0
+        while i < len(day_family_list) and len(max_list) < Parameters.selection_threshold:
+            max_family_id = day_family_list[i]
+            max_preference = Data.preference_cost[family_choices[max_family_id][remove_day]]
+            max_preference_index = i
+            for j in range(i + 1, len(day_family_list), 1):
+                family_id = day_family_list[j]
+                preference = Data.preference_cost[family_choices[family_id][remove_day]]
+                if preference > max_preference:
+                    max_preference = preference
+                    max_preference_index = j
+            if max_preference_index not in max_list:
+                max_list.append(max_preference_index)
+            i = i + 1
+        return max_list
 
     def change(self, s: Solution):
         representation = deepcopy(s.representation)
         occupancy = deepcopy(s.occupancy)
         change_applied = False
         while not change_applied:
-            remove_day, insert_day = random.sample(range(0, Data.n_days), k=2)
-            change_family_index = random.randrange(0, len(representation[remove_day]))
+            min_load_days = self.select_top_min(s.occupancy)
+            max_load_days = self.select_top_max(s.occupancy)
+            # remove_day, insert_day = random.sample(range(0, Data.n_days), k=2)
+            remove_day = max_load_days[random.randrange(0, len(max_load_days))]
+            insert_day = min_load_days[random.randrange(0, len(min_load_days))]
+            max_preference_families = self.select_top_max_preference_families(s.representation[remove_day], \
+                                                                              self.family_choices, remove_day)
+            # change_family_index = random.randrange(0, len(representation[remove_day]))
+            change_family_index = max_preference_families[random.randrange(0, len(max_preference_families))]
             family_id = representation[remove_day][change_family_index]
             day_load_change = int(self.family_list[family_id].n_people)
             is_origin_feasible = occupancy[remove_day] - day_load_change >= Data.min_people
@@ -184,19 +141,23 @@ class ILS:
                 occupancy[remove_day] -= day_load_change
                 occupancy[insert_day] += day_load_change
                 change_applied = True
-                preference_cost = self.preference_cost(representation)
-                accounting_penalty = self.accounting_penalty(occupancy)
-                # preference_cost = self.preference_cost_delta(s.preference_cost, remove_day, insert_day, family_id, day_load_change)
-                # accounting_penalty = self.accounting_penalty_delta(s.occupancy, s.accounting_penalty, remove_day,
-                # ,day_load_change, insert_day)
+                preference_cost = Evaluation.get_preference_cost(representation, \
+                                                                 self.family_list, self.family_choices)
+                accounting_penalty = Evaluation.get_accounting_penalty(occupancy)
                 r = Solution.Solution(representation, occupancy, preference_cost, accounting_penalty)
         return r
 
     def ils_algorithm(self):
-        current: Solution = self.create_initial_solution()
+        init_sol = int(input("What type of initial solution (0-random, 1-from file): "))
+        if init_sol == 0:
+            current: Solution = self.create_initial_solution()
+        else:
+            current: Solution = Data.load_solution_from_file(self.family_list, self.family_choices)
         home: Solution = Solution.copy(current)
         best: Solution = Solution.copy(current)
         i = 1
+        iterations_without_improvment = 0
+        home_base_current = False
         while Parameters.nonstop_run or i <= Parameters.total_time:
             time = Parameters.T[random.randrange(0, len(Parameters.T))]
             j = 1
@@ -213,7 +174,8 @@ class ILS:
                 home = Solution.copy(home)
             current = Solution.copy(home)
             i += 1
-            if i % 2000 == 0 or i == 2:
+            if i % 30 == 0 or i == 2:
+                print("Changed solution: " + str(r.evaluation))
                 print("Writing best solution " + str(round(best.evaluation, 2)) + " to file...")
                 Data.write_family_data(best, self.seed_millis)
         return best

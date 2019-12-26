@@ -2,7 +2,7 @@ import csv
 
 import Familly
 import Solution
-
+import Evaluation
 min_people: int = 125
 max_people: int = 300
 n_days: int = 100
@@ -52,6 +52,34 @@ def write_family_data(solution: Solution, seed_millis):
         family_writer.writerow(['family_id', 'assigned_day'])
         for fd in family_day_list:
             family_writer.writerow([fd[0], fd[1]])
+
+
+def load_solution_from_file(family_list, family_choices):
+    representation = list()
+    occupancy = list()
+    for i in range(n_days):
+        day = list()
+        day_occupancy = 0
+        representation.append(day)
+        occupancy.append(day_occupancy)
+    solution_name = input("Enter solution name: ")
+    with open(solution_name + '.csv') as csv_file:
+        csv_reader = csv.reader(csv_file, delimiter=',')
+        line_count = 0
+        for row in csv_reader:
+            if line_count == 0:
+                print(f'Column names are {", ".join(row)}')
+                line_count += 1
+            else:
+                family_id = int(row[0])
+                assigned_day = int(row[1])
+                representation[assigned_day - 1].append(family_id)  # zero based index
+                occupancy[assigned_day - 1] += int(family_list[family_id].n_people)
+                line_count += 1
+        pref_cost = Evaluation.get_preference_cost(representation, family_list, family_choices)
+        accounting_cost = Evaluation.get_accounting_penalty(occupancy)
+        s = Solution.Solution(representation, occupancy, pref_cost, accounting_cost)
+    return s
 
 
 def get_family_choice(family_list):
