@@ -5,9 +5,13 @@ def get_preference_cost(representation, family_list, family_choices):
     penalty = 0
     for d in range(len(representation)):
         day = representation[d]
+        # print("Day " + str(d + 1) + ": ", end="")
         for f in day:
             pc = Data.preference_cost[family_choices[f][d]]
-            penalty += (pc[0] + int(family_list[f].n_people) * (pc[1] + pc[2]))
+            family_penalty = pc[0] + int(family_list[f].n_people) * (pc[1] + pc[2])
+            # print("[" + str(f) + ", " + str(family_penalty)+"]", end=" ")
+            penalty += family_penalty
+        # print()
     return penalty
 
 
@@ -25,8 +29,10 @@ def get_accounting_penalty(solution_occupancy):
     for i in range(len(solution_occupancy) - 1):
         occupancy_current = solution_occupancy[i]
         occupancy_next = solution_occupancy[i + 1]
-        p = p + ((occupancy_current - 125) / 400.0) * occupancy_current ** (
+        day_penalty = ((occupancy_current - 125) / 400.0) * occupancy_current ** (
                 1 / 2 + (abs(occupancy_current - occupancy_next) / 50.0))
+        # print(day_penalty, end=" ")
+        p = p + day_penalty
     last_occupancy = solution_occupancy[len(solution_occupancy) - 1]
     p += ((last_occupancy - 125) / 400.0) * last_occupancy ** (1 / 2.0)
     return p

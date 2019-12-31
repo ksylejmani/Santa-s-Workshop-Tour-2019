@@ -1,8 +1,9 @@
 import csv
 
+import Evaluation
 import Familly
 import Solution
-import Evaluation
+
 min_people: int = 125
 max_people: int = 300
 n_days: int = 100
@@ -32,7 +33,7 @@ def read_family_data():
                 family_id = int(row[0])
                 choice_list = list()
                 for c in range(1, 11, 1):
-                    choice_list.append(int(row[c]))
+                    choice_list.append(int(row[c]) - 1)  # Transposing DAY index from 1 based to zero based
                 n_people = (row[11])
                 # print(f'\t{family_id} - {n_people}.')
                 line_count += 1
@@ -47,7 +48,7 @@ def write_family_data(solution: Solution, seed_millis):
         for d in range(len(solution.representation)):
             day = solution.representation[d]
             for f in day:
-                family_day_list.append([f, d + 1])
+                family_day_list.append([f, d + 1])  # Transposing back DAY index from 0 based to one based
         family_day_list.sort(key=lambda c: c[0])
         family_writer.writerow(['family_id', 'assigned_day'])
         for fd in family_day_list:
@@ -90,6 +91,6 @@ def get_family_choice(family_list):
         for d in range(n_days):
             family_c.append(10)  # Otherwise
         for c in range(len(day_choices)):
-            family_c[day_choices[c] - 1] = c  # day is converted to a zero based index
+            family_c[day_choices[c]] = c
         family_choices.append(family_c)
     return family_choices
