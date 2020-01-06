@@ -403,7 +403,7 @@ class ILS:
                 if is_acceptable:
                     current = Solution.copy(r)
                 j += 1
-            print("Current solution: " + str(current.evaluation))
+            # print("Current solution: " + str(current.evaluation))
             if current.evaluation < best.evaluation:
                 best = Solution.copy(current)
             else:
