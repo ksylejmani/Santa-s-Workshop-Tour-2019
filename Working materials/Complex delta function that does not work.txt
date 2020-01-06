@@ -1,0 +1,67 @@
+    # def accounting_penalty_delta(self, solution_occupancy, e, remove_day, insert_day, day_load_change,
+    #                              accounting_penalty):
+    #     p = e
+    #     current_remove_day = solution_occupancy[remove_day]
+    #     current_insert_day = solution_occupancy[insert_day]
+    #     previous_remove_day = -1
+    #     next_remove_day = -1
+    #     previous_insert_day = -1
+    #     next_insert_day = -1
+    #     end_effect = 0
+    #     if remove_day != Data.n_days - 1 and insert_day != Data.n_days - 1:
+    #         previous_remove_day = solution_occupancy[remove_day - 1]
+    #         next_remove_day = solution_occupancy[remove_day + 1]
+    #         previous_insert_day = solution_occupancy[insert_day - 1]
+    #         next_insert_day = solution_occupancy[insert_day + 1]
+    #     elif remove_day == 0 and insert_day != Data.n_days - 1:
+    #         next_remove_day = solution_occupancy[remove_day + 1]
+    #         previous_insert_day = solution_occupancy[insert_day - 1]
+    #         next_insert_day = solution_occupancy[insert_day + 1]
+    #     elif remove_day == 0 and insert_day == Data.n_days:
+    #         next_remove_day = solution_occupancy[remove_day + 1]
+    #         previous_insert_day = solution_occupancy[insert_day - 1]
+    #         next_insert_day = current_insert_day
+    #         end_effect = day_load_change
+    #     elif remove_day != Data.n_days - 1 and insert_day == 0:
+    #         previous_remove_day = solution_occupancy[remove_day - 1]
+    #         next_remove_day = solution_occupancy[remove_day + 1]
+    #         next_insert_day = solution_occupancy[insert_day + 1]
+    #     elif remove_day == Data.n_days - 1 and insert_day == 0:
+    #         previous_remove_day = solution_occupancy[remove_day - 1]
+    #         next_remove_day = current_remove_day
+    #         end_effect = day_load_change
+    #         next_insert_day = solution_occupancy[insert_day + 1]
+    #     elif remove_day == Data.n_days - 1 and insert_day != Data.n_days - 1:
+    #         previous_remove_day = solution_occupancy[remove_day - 1]
+    #         next_remove_day = current_remove_day
+    #         end_effect = day_load_change
+    #         previous_insert_day = solution_occupancy[insert_day - 1]
+    #         next_insert_day = solution_occupancy[insert_day + 1]
+    #     elif remove_day != Data.n_days - 1 and insert_day == Data.n_days - 1:
+    #         previous_remove_day = solution_occupancy[remove_day - 1]
+    #         next_remove_day = solution_occupancy[remove_day + 1]
+    #         previous_insert_day = solution_occupancy[insert_day - 1]
+    #         next_insert_day = current_insert_day
+    #         end_effect = day_load_change
+    #     penalty_to_remove = \
+    #         self.penalty_consec_days(previous_remove_day, current_remove_day) \
+    #         + self.penalty_consec_days(current_remove_day, next_remove_day) \
+    #         + self.penalty_consec_days(previous_insert_day, current_insert_day) \
+    #         + self.penalty_consec_days(current_insert_day, next_insert_day)
+    #     if remove_day == insert_day - 1:
+    #         """ In case insert and remove days are one after the other """
+    #         next_remove_day += day_load_change
+    #         previous_insert_day -= day_load_change
+    #     elif remove_day == insert_day + 1:
+    #         previous_remove_day += day_load_change
+    #         next_insert_day -= day_load_change
+    #     penalty_to_add = \
+    #         self.penalty_consec_days(previous_remove_day, current_remove_day - day_load_change) \
+    #         + self.penalty_consec_days(current_remove_day - day_load_change, next_remove_day - end_effect) \
+    #         + self.penalty_consec_days(previous_insert_day, current_insert_day + day_load_change) \
+    #         + self.penalty_consec_days(current_insert_day + day_load_change, next_insert_day + end_effect)
+    #     p -= penalty_to_remove
+    #     p += penalty_to_add
+    #     if abs(accounting_penalty - p) > 0.0001:
+    #         print("test")
+    #     return p
