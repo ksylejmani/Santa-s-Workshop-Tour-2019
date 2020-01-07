@@ -209,6 +209,29 @@ class ILS:
             i = i + 1
         return max_list
 
+    def select_top_max_preference_days(self, representation, family_list, family_choices):
+        preference = list()
+        for d in range(Data.n_days):
+            day_penalty = 0
+            day_family_list = representation[d]
+            for f in day_family_list:
+                pc = Data.preference_cost[family_choices[f][d]]
+                family_penalty = pc[0] + int(family_list[f].n_people) * (pc[1] + pc[2])
+                day_penalty += family_penalty
+            preference.append(day_penalty)
+        max_list = list()
+        d = 0
+        while d < Data.n_days and len(max_list) < Parameters.day_selection_threshold:
+            max_day_id = d
+            max_day_penalty = preference[d]
+            for i in range(d,Data.n_days,1):
+                if i not in max_list and preference[i]>max_day_penalty:
+                    max_day_penalty=preference[i]
+                    max_day_id=i
+            max_list.append(max_day_id)
+            d = d + 1
+        return max_list
+
     def max_difference(self, a, b, c):
         return max(abs(a - b), abs(a - c), abs(b - c))
 
@@ -306,7 +329,13 @@ class ILS:
         change_applied = False
         while not change_applied:
             remove_day = random.randrange(0, Data.n_days)
-            change_family_index = random.randrange(0, len(representation[remove_day]))
+            # max_preference_days_list = self.select_top_max_preference_days(representation, self.family_list,
+            #                                                                self.family_choices)
+            # remove_day = max_preference_days_list[random.randrange(0, len(max_preference_days_list))]
+            max_preference_families = self.select_top_max_preference_families(representation[remove_day], \
+                                                                              self.family_choices, remove_day)
+            change_family_index = max_preference_families[random.randrange(0, len(max_preference_families))]
+            # change_family_index = random.randrange(0, len(representation[remove_day]))
             family_id = representation[remove_day][change_family_index]
             day_load_change = int(self.family_list[family_id].n_people)
             is_origin_feasible = occupancy[remove_day] - day_load_change >= Data.min_people
@@ -393,6 +422,7 @@ class ILS:
         iterations_without_improvment = 0
         home_base_current = False
         while Parameters.nonstop_run or i <= Parameters.total_time:
+            random.seed(int(round(time.time() * 1000)))
             local_search_time = Parameters.T[random.randrange(0, len(Parameters.T))]
             j = 1
             while j <= local_search_time:
@@ -403,15 +433,16 @@ class ILS:
                 if is_acceptable:
                     current = Solution.copy(r)
                 j += 1
-            # print("Current solution: " + str(current.evaluation))
+            print("Current solution: " + str(current.evaluation))
             if current.evaluation < best.evaluation:
                 best = Solution.copy(current)
             else:
                 iterations_without_improvment += 1
             if current.evaluation <= home.evaluation:
                 home = Solution.copy(current)
-            if iterations_without_improvment % Parameters.perturb_frequency == 0:
-                home = self.swap_families(home)
+            if iterations_without_improvment %Parameters.perturb_frequency==0:
+                for p in range(Parameters.perturb_iterations):
+                    home = self.change_based_on_family_choice(best)
             current = Solution.copy(home)
             i += 1
             if i % Parameters.save_to_file_frequency == 0 or i == 2:
