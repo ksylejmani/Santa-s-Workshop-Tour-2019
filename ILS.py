@@ -422,8 +422,9 @@ class ILS:
                 iterations_without_improvment += 1
             if current.evaluation <= home.evaluation:
                 home = Solution.copy(current)
-            # if iterations_without_improvment % Parameters.perturb_frequency == 0:
-            #     home = self.swap_families(home)
+            if iterations_without_improvment % Parameters.perturb_frequency == 0:
+                for p in range(Parameters.perturb_iterations):
+                    home = self.change_based_on_family_choice(best)
             current = Solution.copy(home)
             i += 1
             if i % Parameters.save_to_file_frequency == 0 or i == 2:

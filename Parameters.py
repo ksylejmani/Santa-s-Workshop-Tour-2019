@@ -1,7 +1,7 @@
 # standard ILS parameters
 T = [5, 10, 15, 20, 25]
 total_time = 5000
-perturb_iterations = 2
+perturb_iterations = 1
 perturb_frequency = 1000
 nonstop_run = True
 save_to_file_frequency = 100
