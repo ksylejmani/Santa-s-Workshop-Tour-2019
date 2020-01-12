@@ -1,0 +1,78 @@
+    def swap_families(self, s: Solution):
+        representation = deepcopy(s.representation)
+        occupancy = deepcopy(s.occupancy)
+        best_first_day = -1
+        best_second_day = -1
+        best_first_family_id = -1
+        best_second_family_id = -1
+        best_first_day_foreseen_load = -1
+        best_second_day_foreseen_load = -1
+        best_preference_cost = s.preference_cost
+        best_accounting_penalty = s.accounting_penalty
+        preference_above_limit = self.select_preference_above_limit(
+            representation, self.family_list, self.family_choices)
+        first_day, first_family_id = preference_above_limit[
+            random.randrange(0, len(preference_above_limit))]
+        list_of_families_prefering_first_day = self.day_choices[first_day]
+        random.shuffle(list_of_families_prefering_first_day)
+        random.shuffle(self.shuffled_days)
+        swap_applied = False
+        for f in list_of_families_prefering_first_day:
+            if f not in representation[first_day]:
+                for d in self.shuffled_days:
+                    if d == first_day:
+                        continue
+                    else:
+                        if f in representation[d]:
+                            second_day = d
+                            second_family_id = f
+                            first_day_load_change = int(self.family_list[first_family_id].n_people)
+                            second_day_load_change = int(self.family_list[second_family_id].n_people)
+                            first_day_foreseen_load = \
+                                occupancy[first_day] - first_day_load_change + second_day_load_change
+                            is_first_feasible = (first_day_foreseen_load >= Data.min_people) and \
+                                                (first_day_foreseen_load <= Data.max_people)
+                            second_day_foreseen_load = \
+                                occupancy[second_day] - second_day_load_change + first_day_load_change
+                            is_second_feasible = (second_day_foreseen_load <= Data.max_people) and \
+                                                 (second_day_foreseen_load >= Data.min_people)
+                            if is_first_feasible and is_second_feasible:
+                                representation[first_day].remove(first_family_id)
+                                representation[second_day].append(first_family_id)
+                                representation[second_day].remove(second_family_id)
+                                representation[first_day].append(second_family_id)
+                                occupancy[first_day] = first_day_foreseen_load
+                                occupancy[second_day] = second_day_foreseen_load
+                                # swap_applied = True
+                                # break
+                                preference_cost = Evaluation.get_preference_cost(
+                                    representation, self.family_list, self.family_choices)
+                                accounting_penalty = Evaluation.get_accounting_penalty(occupancy)
+                                if preference_cost + accounting_penalty < \
+                                        best_preference_cost + best_accounting_penalty:
+                                    best_first_day = first_day
+                                    best_second_day = second_day
+                                    best_first_family_id = first_family_id
+                                    best_second_family_id = second_family_id
+                                    best_first_day_foreseen_load = first_day_foreseen_load
+                                    best_second_day_foreseen_load = second_day_foreseen_load
+                                    best_preference_cost = preference_cost
+                                    best_accounting_penalty = accounting_penalty
+                                representation[first_day].append(first_family_id)
+                                representation[second_day].remove(first_family_id)
+                                representation[second_day].append(second_family_id)
+                                representation[first_day].remove(second_family_id)
+                                occupancy[first_day] += (first_day_load_change - second_day_load_change)
+                                occupancy[second_day] += (- first_day_load_change + second_day_load_change)
+
+                # if swap_applied:
+                #     break
+        representation[best_first_day].remove(best_first_family_id)
+        representation[best_second_day].append(best_first_family_id)
+        representation[best_second_day].remove(best_second_family_id)
+        representation[best_first_day].append(best_second_family_id)
+        occupancy[best_first_day] = best_first_day_foreseen_load
+        occupancy[best_second_day] = best_second_day_foreseen_load
+        r = Solution.Solution(
+            representation, occupancy, best_preference_cost, best_accounting_penalty)
+        return r

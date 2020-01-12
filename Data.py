@@ -7,6 +7,7 @@ import Solution
 min_people: int = 125
 max_people: int = 300
 n_days: int = 100
+n_families: int = 5000
 preference_cost = {0: [0, 0, 0],
                    1: [50, 0, 0],
                    2: [50, 9, 0],
@@ -94,3 +95,14 @@ def get_family_choice(family_list):
             family_c[day_choices[c]] = c
         family_choices.append(family_c)
     return family_choices
+
+
+def get_day_choice(family_list):
+    day_choices = list()
+    for d in range(n_days):
+        single_day_choice = list()
+        day_choices.append(single_day_choice)
+    for f in range(len(family_list)):
+        for c in family_list[f].choice:
+            day_choices[c].append(f)
+    return day_choices

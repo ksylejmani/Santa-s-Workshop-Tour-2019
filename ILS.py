@@ -12,11 +12,12 @@ class ILS:
     def __init__(self):
         self.family_list = Data.read_family_data()
         self.family_choices = Data.get_family_choice(self.family_list)
+        self.day_choices = Data.get_day_choice(self.family_list)
         self.total_people = self.get_total_people()
         self.average_people_per_day = self.total_people / Data.n_days
         self.seed_millis = int(round(time.time() * 1000))
         random.seed(self.seed_millis)
-        self.shuffled_days = list(range(1, 101))
+        self.shuffled_days = list(range(0, 100))
         random.shuffle(self.shuffled_days)
 
     def get_total_people(self):
@@ -55,12 +56,12 @@ class ILS:
                     break
             if not family_assigned:
                 for d in self.shuffled_days:
-                    is_valid_assignment = (solution_occupancy[d - 1] + int(
-                        family.n_people) <= Data.max_people) and (solution_occupancy[d - 1] + int(
+                    is_valid_assignment = (solution_occupancy[d] + int(
+                        family.n_people) <= Data.max_people) and (solution_occupancy[d] + int(
                         family.n_people) >= Data.min_people)
                     if is_valid_assignment:
-                        representation[d - 1].append(family.id)
-                        solution_occupancy[d - 1] += int(family.n_people)
+                        representation[d].append(family.id)
+                        solution_occupancy[d] += int(family.n_people)
                         family_index_random_order.pop(0)
                         break
         pref_cost = Evaluation.get_preference_cost(representation, self.family_list, self.family_choices)
@@ -266,6 +267,45 @@ class ILS:
             s = s + o
         return s / Data.n_days
 
+    def select_preference_above_limit(self, representation, family_list, family_choices):
+        max_list = list()
+        for d in range(Data.n_days):
+            day_family_list = representation[d]
+            for f in day_family_list:
+                pc = Data.preference_cost[family_choices[f][d]]
+                family_penalty = pc[0] + int(family_list[f].n_people) * (pc[1] + pc[2])
+                if family_penalty > Parameters.family_preference_limit:
+                    max_list.append((d, f))
+                    # print("family_penalty: "+str(family_penalty))
+        # if len(max_list) == 0:
+        #     Parameters.family_preference_limit /= 2
+        #     return max_list+ self.select_preference_above_limit(representation, family_list, family_choices)
+        # else:
+        return max_list
+
+    def select_top_max_preference_days(self, representation, family_list, family_choices):
+        preference = list()
+        for d in range(Data.n_days):
+            day_penalty = 0
+            day_family_list = representation[d]
+            for f in day_family_list:
+                pc = Data.preference_cost[family_choices[f][d]]
+                family_penalty = pc[0] + int(family_list[f].n_people) * (pc[1] + pc[2])
+                day_penalty += family_penalty
+            preference.append(day_penalty)
+        max_list = list()
+        d = 0
+        while d < Data.n_days and len(max_list) < Parameters.day_selection_threshold:
+            max_day_id = d
+            max_day_penalty = preference[d]
+            for i in range(d, Data.n_days, 1):
+                if i not in max_list and preference[i] > max_day_penalty:
+                    max_day_penalty = preference[i]
+                    max_day_id = i
+            max_list.append(max_day_id)
+            d = d + 1
+        return max_list
+
     def change(self, s: Solution):
         representation = deepcopy(s.representation)
         occupancy = deepcopy(s.occupancy)
@@ -341,42 +381,110 @@ class ILS:
         r = Solution.Solution(representation, occupancy, preference_cost, accounting_penalty)
         return r
 
+    def change_systematic(self, s: Solution):
+        representation = deepcopy(s.representation)
+        occupancy = deepcopy(s.occupancy)
+        best_evaluation = s.evaluation
+        best_remove_day = -1
+        best_insert_day = -1
+        best_family_id = -1
+        best_day_load_change = -1
+        best_preference_cost = s.preference_cost
+        best_accounting_penalty = s.accounting_penalty
+        top_max_preference_days = self.select_top_max_preference_days(
+            representation, self.family_list, self.family_choices)
+        for remove_day in top_max_preference_days:
+            top_max_preference_families = self.select_top_max_preference_families(
+                representation[remove_day], self.family_choices, remove_day)
+            for family_id in top_max_preference_families:
+                for insert_day in range(Data.n_days):
+                    if insert_day != remove_day:
+                        day_load_change = int(self.family_list[family_id].n_people)
+                        is_origin_feasible = occupancy[remove_day] - day_load_change >= Data.min_people
+                        is_destination_feasible = occupancy[insert_day] + day_load_change <= Data.max_people
+                        if is_origin_feasible and is_destination_feasible:
+                            representation[remove_day].remove(family_id)
+                            representation[insert_day].append(family_id)
+                            occupancy[remove_day] -= day_load_change
+                            occupancy[insert_day] += day_load_change
+                            preference_cost = Evaluation.get_preference_cost(
+                                representation, self.family_list, self.family_choices)
+                            accounting_penalty = Evaluation.get_accounting_penalty(occupancy)
+                            if preference_cost + accounting_penalty < best_evaluation:
+                                best_evaluation = preference_cost + accounting_penalty
+                                best_remove_day = remove_day
+                                best_insert_day = insert_day
+                                best_family_id = family_id
+                                best_day_load_change = day_load_change
+                                best_preference_cost = preference_cost
+                                best_accounting_penalty = accounting_penalty
+                            representation[remove_day].append(family_id)
+                            representation[insert_day].remove(family_id)
+                            occupancy[remove_day] += day_load_change
+                            occupancy[insert_day] -= day_load_change
+                            print("Test")
+        representation[best_remove_day].append(best_family_id)
+        representation[best_insert_day].remove(best_family_id)
+        occupancy[best_remove_day] += best_day_load_change
+        occupancy[best_insert_day] -= best_day_load_change
+        r = Solution.Solution(representation, occupancy, best_preference_cost, best_accounting_penalty)
+        return r
+
     def swap_families(self, s: Solution):
         representation = deepcopy(s.representation)
         occupancy = deepcopy(s.occupancy)
-        change_applied = False
-        for i in range(Parameters.change_intensity):
-            first_day, second_day = random.sample(range(0, Data.n_days), k=2)
-            # remove_day = max_load_differences[random.randrange(0, len(max_load_differences))]
-            # insert_day = min_load_differences[random.randrange(0, len(min_load_differences))]
-            # insert_day = min_load_days[random.randrange(0, len(min_load_days))]
-            # max_preference_families = self.select_top_max_preference_families(s.representation[first_day], \
-            #                                                                   self.family_choices, first_day)
-            first_family_index = random.randrange(0, len(representation[first_day]))
-            second_family_index = random.randrange(0, len(representation[second_day]))
-            # change_family_index = max_preference_families[random.randrange(0, len(max_preference_families))]
-            first_family_id = representation[first_day][first_family_index]
-            second_family_id = representation[second_day][second_family_index]
-            first_day_load_change = int(self.family_list[first_family_id].n_people)
-            second_day_load_change = int(self.family_list[second_family_id].n_people)
-            first_day_foreseen_load = occupancy[first_day] - first_day_load_change + second_day_load_change
-            is_first_feasible = (first_day_foreseen_load >= Data.min_people) and \
-                                (first_day_foreseen_load <= Data.max_people)
-            second_day_foreseen_load = occupancy[second_day] - second_day_load_change + first_day_load_change
-            is_second_feasible = (second_day_foreseen_load <= Data.max_people) and \
-                                 (second_day_foreseen_load >= Data.min_people)
-            if is_first_feasible and is_second_feasible:
-                representation[first_day].pop(first_family_index)
-                representation[second_day].append(first_family_id)
-                representation[second_day].pop(second_family_index)
-                representation[first_day].append(second_family_id)
-                occupancy[first_day] = first_day_foreseen_load
-                occupancy[second_day] = second_day_foreseen_load
-                change_applied = True
-        preference_cost = Evaluation.get_preference_cost(representation, \
-                                                         self.family_list, self.family_choices)
+        preference_above_limit = self.select_preference_above_limit(
+            representation, self.family_list, self.family_choices)
+        if len(preference_above_limit) == 0:
+            Parameters.family_preference_limit /= 2
+            return s
+        first_day, first_family_id = preference_above_limit[
+            random.randrange(0, len(preference_above_limit))]
+        list_of_families_prefering_first_day = self.day_choices[first_day]
+        random.shuffle(list_of_families_prefering_first_day)
+        all_families_list = list(range(0, Data.n_families))
+        random.shuffle(all_families_list)
+        list_of_families_prefering_first_day = list(
+            list_of_families_prefering_first_day + \
+            list(set(all_families_list) - set(list_of_families_prefering_first_day)))
+        # random.shuffle(self.shuffled_days)
+        swap_applied = False
+        for f in list_of_families_prefering_first_day:
+            if f not in representation[first_day]:
+                for d in self.shuffled_days:
+                    if d == first_day:
+                        continue
+                    else:
+                        if f in representation[d]:
+                            second_day = d
+                            second_family_id = f
+                            first_day_load_change = int(self.family_list[first_family_id].n_people)
+                            second_day_load_change = int(self.family_list[second_family_id].n_people)
+                            first_day_foreseen_load = \
+                                occupancy[first_day] - first_day_load_change + second_day_load_change
+                            is_first_feasible = (first_day_foreseen_load >= Data.min_people) and \
+                                                (first_day_foreseen_load <= Data.max_people)
+                            second_day_foreseen_load = \
+                                occupancy[second_day] - second_day_load_change + first_day_load_change
+                            is_second_feasible = (second_day_foreseen_load <= Data.max_people) and \
+                                                 (second_day_foreseen_load >= Data.min_people)
+                            if is_first_feasible and is_second_feasible:
+                                representation[first_day].remove(first_family_id)
+                                representation[second_day].append(first_family_id)
+                                representation[second_day].remove(second_family_id)
+                                representation[first_day].append(second_family_id)
+                                occupancy[first_day] = first_day_foreseen_load
+                                occupancy[second_day] = second_day_foreseen_load
+                                swap_applied = True
+                                # print("swap_applied")
+                                break
+                if swap_applied:
+                    break
+        preference_cost = Evaluation.get_preference_cost(
+            representation, self.family_list, self.family_choices)
         accounting_penalty = Evaluation.get_accounting_penalty(occupancy)
-        r = Solution.Solution(representation, occupancy, preference_cost, accounting_penalty)
+        r = Solution.Solution(
+            representation, occupancy, preference_cost, accounting_penalty)
         return r
 
     def swap_days(self, representation, occupancy):
@@ -408,7 +516,11 @@ class ILS:
             local_search_time = Parameters.T[random.randrange(0, len(Parameters.T))]
             j = 1
             while j <= local_search_time:
-                r = self.change_based_on_family_choice(current)
+                random_operator_selection = random.randrange(0, 100)
+                if random_operator_selection <= 40:
+                    r = self.swap_families(current)
+                else:
+                    r = self.change_based_on_family_choice(current)
                 is_acceptable = \
                     r.evaluation <= current.evaluation or \
                     random.randrange(0, 100) < Parameters.acceptance_chance
