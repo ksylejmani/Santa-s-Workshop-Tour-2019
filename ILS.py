@@ -313,16 +313,16 @@ class ILS:
         while not change_applied:
             # max_load_days = self.select_top_max(occupancy)
             # min_load_days = self.select_top_min(occupancy)
-            # max_load_differences = self.select_top_disbalancing_days(s.occupancy)
-            # min_load_differences = self.select_top_balancing_days(occupancy)
+            max_load_differences = self.select_top_disbalancing_days(s.occupancy)
+            min_load_differences = self.select_top_balancing_days(occupancy)
             # print("remove_day: "+str(remove_day)+" insert_day: "+ str(insert_day))
             # remove_day = max_load_days[random.randrange(0, len(max_load_days))]
-            # remove_day = max_load_differences[random.randrange(0, len(max_load_differences))]
-            # insert_day = min_load_differences[random.randrange(0, len(min_load_differences))]
+            remove_day = max_load_differences[random.randrange(0, len(max_load_differences))]
+            insert_day = min_load_differences[random.randrange(0, len(min_load_differences))]
             # insert_day = min_load_days[random.randrange(0, len(min_load_days))]
             # max_preference_families = self.select_top_max_preference_families(representation[remove_day], \
             #                                                                   self.family_choices, remove_day)
-            remove_day, insert_day = random.sample(range(0, Data.n_days), k=2)
+            # remove_day, insert_day = random.sample(range(0, Data.n_days), k=2)
             change_family_index = random.randrange(0, len(representation[remove_day]))
             family_id = representation[remove_day][change_family_index]
             day_load_change = int(self.family_list[family_id].n_people)
@@ -364,7 +364,11 @@ class ILS:
             if not is_origin_feasible:
                 continue
             family = self.family_list[family_id]
-            for insert_day in family.choice:
+            all_days = list(range(0, 100))
+            random.shuffle(all_days)
+            family_choice = list(family.choice)
+            list_of_days_to_consider_for_insertion = list(family_choice + list(set(all_days) - set(family_choice)))
+            for insert_day in list_of_days_to_consider_for_insertion:
                 if insert_day == remove_day:
                     continue
                 is_destination_feasible = occupancy[insert_day] + day_load_change <= Data.max_people
@@ -447,7 +451,7 @@ class ILS:
         list_of_families_prefering_first_day = list(
             list_of_families_prefering_first_day + \
             list(set(all_families_list) - set(list_of_families_prefering_first_day)))
-        # random.shuffle(self.shuffled_days)
+        random.shuffle(self.shuffled_days)
         swap_applied = False
         for f in list_of_families_prefering_first_day:
             if f not in representation[first_day]:
@@ -517,7 +521,7 @@ class ILS:
             j = 1
             while j <= local_search_time:
                 random_operator_selection = random.randrange(0, 100)
-                if random_operator_selection <= 40:
+                if random_operator_selection <= Parameters.swap_operator_chance:
                     r = self.swap_families(current)
                 else:
                     r = self.change_based_on_family_choice(current)
@@ -542,6 +546,7 @@ class ILS:
             if i % Parameters.save_to_file_frequency == 0 or i == 2:
                 print("Writing best solution " + str(round(best.evaluation, 2)) + " to file...")
                 Data.write_family_data(best, self.seed_millis)
+                # self.print_solution(best)
         self.print_solution(best)
         Evaluation.get_preference_cost(best.representation, self.family_list, self.family_choices)
         return best
