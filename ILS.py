@@ -348,17 +348,27 @@ class ILS:
             random_number = random.randrange(0, 100)
             if random_number < Parameters.anywhere_remove_chance:
                 remove_day = random.randrange(0, Data.n_days)
+                change_family_index = random.randrange(0, len(representation[remove_day]))
+                family_id = representation[remove_day][change_family_index]
             elif random_number < Parameters.anywhere_remove_chance + Parameters.max_load_remove_chance:
                 max_load_days = self.select_top_max(occupancy)
                 remove_day = max_load_days[random.randrange(0, len(max_load_days))]
-            else:
+                change_family_index = random.randrange(0, len(representation[remove_day]))
+                family_id = representation[remove_day][change_family_index]
+            elif random_number < Parameters.anywhere_remove_chance + Parameters.max_load_remove_chance + \
+                    Parameters.max_load_remove_chance:
                 max_load_differences = self.select_top_disbalancing_days(s.occupancy)
                 remove_day = max_load_differences[random.randrange(0, len(max_load_differences))]
-            # max_preference_families = self.select_top_max_preference_families(representation[remove_day], \
-            #                                                                   self.family_choices, remove_day)
-            # change_family_index = max_preference_families[random.randrange(0, len(max_preference_families))]
-            change_family_index = random.randrange(0, len(representation[remove_day]))
-            family_id = representation[remove_day][change_family_index]
+                change_family_index = random.randrange(0, len(representation[remove_day]))
+                family_id = representation[remove_day][change_family_index]
+            else:
+                preference_above_limit = self.select_preference_above_limit(
+                    representation, self.family_list, self.family_choices)
+                if len(preference_above_limit) == 0:
+                    Parameters.family_preference_limit /= 2
+                    return s
+                remove_day, family_id = preference_above_limit[
+                    random.randrange(0, len(preference_above_limit))]
             day_load_change = int(self.family_list[family_id].n_people)
             is_origin_feasible = occupancy[remove_day] - day_load_change >= Data.min_people
             if not is_origin_feasible:
@@ -373,7 +383,7 @@ class ILS:
                     continue
                 is_destination_feasible = occupancy[insert_day] + day_load_change <= Data.max_people
                 if is_destination_feasible:
-                    representation[remove_day].pop(change_family_index)
+                    representation[remove_day].remove(family_id)
                     representation[insert_day].append(family_id)
                     occupancy[remove_day] -= day_load_change
                     occupancy[insert_day] += day_load_change

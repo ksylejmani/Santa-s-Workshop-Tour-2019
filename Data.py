@@ -28,7 +28,7 @@ def read_family_data():
         line_count = 0
         for row in csv_reader:
             if line_count == 0:
-                print(f'Column names are {", ".join(row)}')
+                # print(f'Column names are {", ".join(row)}')
                 line_count += 1
             else:
                 family_id = int(row[0])
