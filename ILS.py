@@ -69,79 +69,6 @@ class ILS:
         result = Solution.Solution(representation, solution_occupancy, pref_cost, acc_penalty)
         return result
 
-    def create_exact_solution(self):
-        representation = list()
-        solution_occupancy = list()
-        for current_day in range(Data.n_days):
-            day = list()
-            day_occupancy = 0
-            representation.append(day)
-            solution_occupancy.append(day_occupancy)
-        for family in self.family_list:
-            day = family.choice[0]
-            representation[day].append(family.id)
-            solution_occupancy[day] += int(family.n_people)
-        for current_day in range(Data.n_days):
-            while solution_occupancy[current_day] > Data.max_people:
-                family_id = representation[current_day][0]
-                family_is_assigned = False
-                choice_list = self.family_list[family_id].choice
-                family_members = self.family_list[family_id].n_people
-                for j in range(1, len(choice_list), 1):
-                    alternative_day = choice_list[j]
-                    if solution_occupancy[alternative_day] + int(family_members) <= Data.max_people:
-                        representation[current_day].pop(0)
-                        representation[alternative_day].append(family_id)
-                        solution_occupancy[current_day] -= int(family_members)
-                        solution_occupancy[alternative_day] += int(family_members)
-                        family_is_assigned = True
-                        break
-                if family_is_assigned:
-                    continue
-                else:
-                    for another_day in range(Data.n_days):
-                        if another_day not in choice_list and \
-                                solution_occupancy[another_day] + int(family_members) <= Data.max_people:
-                            representation[current_day].pop(0)
-                            representation[another_day].append(family_id)
-                            solution_occupancy[another_day] -= int(family_members)
-                            solution_occupancy[another_day] += int(family_members)
-                            break
-        for current_day in range(Data.n_days):
-            while solution_occupancy[current_day] > self.average_people_per_day:
-                if current_day < len(representation[current_day]):
-                    family_id = representation[current_day][0]
-                    family_is_assigned = False
-                    choice_list = self.family_list[family_id].choice
-                    family_members = self.family_list[family_id].n_people
-                    for j in range(1, len(choice_list), 1):
-                        alternative_day = choice_list[j]
-                        if solution_occupancy[alternative_day] < Data.min_people:
-                            representation[current_day].pop(0)
-                            representation[alternative_day].append(family_id)
-                            solution_occupancy[current_day] -= int(family_members)
-                            solution_occupancy[alternative_day] += int(family_members)
-                            family_is_assigned = True
-                            break
-                    if family_is_assigned:
-                        continue
-                    else:
-                        for another_day in range(Data.n_days):
-                            if another_day not in choice_list and \
-                                    solution_occupancy[another_day] < self.average_people_per_day:
-                                representation[current_day].pop(0)
-                                representation[another_day].append(family_id)
-                                solution_occupancy[another_day] -= int(family_members)
-                                solution_occupancy[another_day] += int(family_members)
-                                break
-                else:
-                    break
-        pref_cost = Evaluation.get_preference_cost(representation, self.family_list, self.family_choices)
-        acc_penalty = Evaluation.get_accounting_penalty(solution_occupancy)
-        result = Solution.Solution(representation, solution_occupancy, pref_cost, acc_penalty)
-        self.print_solution(result)
-        return result
-
     def print_solution(self, solution: Solution):
         for i in range(Data.n_days):
             print('{:5s}'.format(str(i + 1)), end="")
@@ -206,7 +133,7 @@ class ILS:
                     max_family_penalty = family_penalty
                     max_penalty_index = j
             if max_penalty_index not in max_list:
-                max_list.append(max_penalty_index)
+                max_list.append(day_family_list[max_penalty_index])
             i = i + 1
         return max_list
 
@@ -299,30 +226,30 @@ class ILS:
             max_day_id = d
             max_day_penalty = preference[d]
             for i in range(d, Data.n_days, 1):
-                if i not in max_list and preference[i] > max_day_penalty:
+                if (i not in max_list) and preference[i] > max_day_penalty:
                     max_day_penalty = preference[i]
                     max_day_id = i
             max_list.append(max_day_id)
             d = d + 1
         return max_list
 
-    def change(self, s: Solution):
+    def naive_change(self, s: Solution):
         representation = deepcopy(s.representation)
         occupancy = deepcopy(s.occupancy)
         change_applied = False
         while not change_applied:
             # max_load_days = self.select_top_max(occupancy)
             # min_load_days = self.select_top_min(occupancy)
-            max_load_differences = self.select_top_disbalancing_days(s.occupancy)
-            min_load_differences = self.select_top_balancing_days(occupancy)
+            # max_load_differences = self.select_top_disbalancing_days(s.occupancy)
+            # min_load_differences = self.select_top_balancing_days(occupancy)
             # print("remove_day: "+str(remove_day)+" insert_day: "+ str(insert_day))
             # remove_day = max_load_days[random.randrange(0, len(max_load_days))]
-            remove_day = max_load_differences[random.randrange(0, len(max_load_differences))]
-            insert_day = min_load_differences[random.randrange(0, len(min_load_differences))]
+            # remove_day = max_load_differences[random.randrange(0, len(max_load_differences))]
+            # insert_day = min_load_differences[random.randrange(0, len(min_load_differences))]
             # insert_day = min_load_days[random.randrange(0, len(min_load_days))]
             # max_preference_families = self.select_top_max_preference_families(representation[remove_day], \
             #                                                                   self.family_choices, remove_day)
-            # remove_day, insert_day = random.sample(range(0, Data.n_days), k=2)
+            remove_day, insert_day = random.sample(range(0, Data.n_days), k=2)
             change_family_index = random.randrange(0, len(representation[remove_day]))
             family_id = representation[remove_day][change_family_index]
             day_load_change = int(self.family_list[family_id].n_people)
@@ -393,55 +320,6 @@ class ILS:
                                                          self.family_list, self.family_choices)
         accounting_penalty = Evaluation.get_accounting_penalty(occupancy)
         r = Solution.Solution(representation, occupancy, preference_cost, accounting_penalty)
-        return r
-
-    def change_systematic(self, s: Solution):
-        representation = deepcopy(s.representation)
-        occupancy = deepcopy(s.occupancy)
-        best_evaluation = s.evaluation
-        best_remove_day = -1
-        best_insert_day = -1
-        best_family_id = -1
-        best_day_load_change = -1
-        best_preference_cost = s.preference_cost
-        best_accounting_penalty = s.accounting_penalty
-        top_max_preference_days = self.select_top_max_preference_days(
-            representation, self.family_list, self.family_choices)
-        for remove_day in top_max_preference_days:
-            top_max_preference_families = self.select_top_max_preference_families(
-                representation[remove_day], self.family_choices, remove_day)
-            for family_id in top_max_preference_families:
-                for insert_day in range(Data.n_days):
-                    if insert_day != remove_day:
-                        day_load_change = int(self.family_list[family_id].n_people)
-                        is_origin_feasible = occupancy[remove_day] - day_load_change >= Data.min_people
-                        is_destination_feasible = occupancy[insert_day] + day_load_change <= Data.max_people
-                        if is_origin_feasible and is_destination_feasible:
-                            representation[remove_day].remove(family_id)
-                            representation[insert_day].append(family_id)
-                            occupancy[remove_day] -= day_load_change
-                            occupancy[insert_day] += day_load_change
-                            preference_cost = Evaluation.get_preference_cost(
-                                representation, self.family_list, self.family_choices)
-                            accounting_penalty = Evaluation.get_accounting_penalty(occupancy)
-                            if preference_cost + accounting_penalty < best_evaluation:
-                                best_evaluation = preference_cost + accounting_penalty
-                                best_remove_day = remove_day
-                                best_insert_day = insert_day
-                                best_family_id = family_id
-                                best_day_load_change = day_load_change
-                                best_preference_cost = preference_cost
-                                best_accounting_penalty = accounting_penalty
-                            representation[remove_day].append(family_id)
-                            representation[insert_day].remove(family_id)
-                            occupancy[remove_day] += day_load_change
-                            occupancy[insert_day] -= day_load_change
-                            print("Test")
-        representation[best_remove_day].append(best_family_id)
-        representation[best_insert_day].remove(best_family_id)
-        occupancy[best_remove_day] += best_day_load_change
-        occupancy[best_insert_day] -= best_day_load_change
-        r = Solution.Solution(representation, occupancy, best_preference_cost, best_accounting_penalty)
         return r
 
     def swap_families(self, s: Solution):
@@ -524,7 +402,6 @@ class ILS:
         best: Solution = Solution.copy(current)
         i = 1
         iterations_without_improvment = 0
-        home_base_current = False
         while Parameters.nonstop_run or i <= Parameters.total_time:
             random.seed(int(round(time.time() * 1000)))
             local_search_time = Parameters.T[random.randrange(0, len(Parameters.T))]
@@ -556,7 +433,7 @@ class ILS:
             if i % Parameters.save_to_file_frequency == 0 or i == 2:
                 print("Writing best solution " + str(round(best.evaluation, 2)) + " to file...")
                 Data.write_family_data(best, self.seed_millis)
-                # self.print_solution(best)
+                self.print_solution(best)
         self.print_solution(best)
         Evaluation.get_preference_cost(best.representation, self.family_list, self.family_choices)
         return best
@@ -565,7 +442,6 @@ class ILS:
 def main():
     ils = ILS()
     ils.ils_algorithm()
-    # ils.create_exact_solution()
 
 
 main()
