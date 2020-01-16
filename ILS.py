@@ -433,7 +433,7 @@ class ILS:
             if i % Parameters.save_to_file_frequency == 0 or i == 2:
                 print("Writing best solution " + str(round(best.evaluation, 2)) + " to file...")
                 Data.write_family_data(best, self.seed_millis)
-                self.print_solution(best)
+                # self.print_solution(best)
         self.print_solution(best)
         Evaluation.get_preference_cost(best.representation, self.family_list, self.family_choices)
         return best

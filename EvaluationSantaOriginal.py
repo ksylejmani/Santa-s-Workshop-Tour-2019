@@ -26,15 +26,15 @@ def get_preference_cost_delta(e, family_choices, remove_day, insert_day, family_
 
 def get_accounting_penalty(solution_occupancy):
     p = 0
-    for i in range(len(solution_occupancy)):
-        for j in range(1, 6, 1):
-            occupancy_current = solution_occupancy[i]
-            occupancy_next = solution_occupancy[i + j] if i + j < Data.n_days else \
-                solution_occupancy[Data.n_days - 1]
-            day_penalty_unit = ((occupancy_current - 125) / 400.0) * occupancy_current ** (
-                    1 / 2 + (abs(occupancy_current - occupancy_next) / 50.0)) / j ** 2
-            # print(day_penalty, end=" ")
-            p = p + day_penalty_unit
+    for i in range(len(solution_occupancy) - 1):
+        occupancy_current = solution_occupancy[i]
+        occupancy_next = solution_occupancy[i + 1]
+        day_penalty = ((occupancy_current - 125) / 400.0) * occupancy_current ** (
+                1 / 2 + (abs(occupancy_current - occupancy_next) / 50.0))
+        # print(day_penalty, end=" ")
+        p = p + day_penalty
+    last_occupancy = solution_occupancy[len(solution_occupancy) - 1]
+    p += ((last_occupancy - 125) / 400.0) * last_occupancy ** (1 / 2.0)
     return p
 
 
